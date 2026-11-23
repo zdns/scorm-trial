@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>SCORM relay test page</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #1d2330;
+      --muted: #5c6475;
+      --card: #f4f6f9;
+      --border: #d8dce4;
+      --accent: #1f6feb;
+      --ok: #1a7f37;
+      --warn: #9a6700;
+      --bad: #cf222e;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1218;
+        --fg: #e6e9ef;
+        --muted: #9aa3b2;
+        --card: #1a1f29;
+        --border: #2c3341;
+        --accent: #4c8dff;
+        --ok: #3fb950;
+        --warn: #d29922;
+        --bad: #f85149;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 16px;
+      background: var(--bg);
+      color: var(--fg);
+      font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    main { max-width: 760px; margin: 0 auto; }
+    h1 { font-size: 1.4rem; margin: 0 0 4px; }
+    h2 { font-size: 1rem; margin: 0 0 8px; }
+    .sub { color: var(--muted); margin: 0 0 16px; }
+    section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+    }
+    .banner { font-weight: 600; }
+    .banner.ok { color: var(--ok); }
+    .banner.warn { color: var(--warn); }
+    dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; }
+    dt { color: var(--muted); }
+    dd { margin: 0; font-family: ui-monospace, Consolas, monospace; word-break: break-all; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .row:last-child { margin-bottom: 0; }
+    .label { color: var(--muted); min-width: 90px; }
+    button {
+      font: inherit;
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--fg);
+      cursor: pointer;
+    }
+    button:hover:not(:disabled) { border-color: var(--accent); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    #log {
+      margin: 0;
+      max-height: 220px;
+      overflow: auto;
+      font: 13px/1.4 ui-monospace, Consolas, monospace;
+      white-space: pre-wrap;
+    }
+    .note { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>SCORM relay test page</h1>
+  <p class="sub">Dummy content for the NEO courses prototype. Page version <strong id="version"></strong>.</p>
+
+  <section>
+    <p id="banner" class="banner"></p>
+    <dl id="launch"></dl>
+  </section>
+
+  <section>
+    <h2>Send to the LMS</h2>
+    <div class="row">
+      <span class="label">Progress</span>
+      <button data-fn="setProgress" data-arg="0.25">25 %</button>
+      <button data-fn="setProgress" data-arg="0.5">50 %</button>
+      <button data-fn="setProgress" data-arg="1">100 %</button>
+    </div>
+    <div class="row">
+      <span class="label">Score</span>
+      <button data-fn="setScore" data-arg="40">40</button>
+      <button data-fn="setScore" data-arg="80">80</button>
+    </div>
+    <div class="row">
+      <span class="label">Status</span>
+      <button data-fn="setLessonStatus" data-arg="incomplete">incomplete</button>
+      <button data-fn="setLessonStatus" data-arg="completed">completed</button>
+      <button data-fn="setLessonStatus" data-arg="passed">passed</button>
+      <button data-fn="setLessonStatus" data-arg="failed">failed</button>
+    </div>
+    <p class="note">Messages are one-way: the launcher sends no confirmation back. Check the result in the LMS. If the origin does not match, the browser drops the message silently.</p>
+  </section>
+
+  <section>
+    <h2>Sent messages</h2>
+    <pre id="log">Nothing sent yet.</pre>
+  </section>
+</main>
+
+<script>
+  // Bump on every deploy, so the LMS test can confirm that a change shows up without re-uploading the launcher.
+  var PAGE_VERSION = "1";
+
+  // Query parameters appended by the SCOL-R launcher: scorm, learner_id, learner_name, lms_origin, are_identifiers_hashed.
+  // SCOL-R does not URL-encode learner_id and learner_name, so URLSearchParams turns a "+" in them into a space.
+  var params = new URLSearchParams(window.location.search);
+  var lmsOrigin = params.get("lms_origin");
+  var inFrame = window.parent !== window;
+  var launched = params.has("scorm") && !!lmsOrigin && inFrame;
+
+  document.getElementById("version").textContent = PAGE_VERSION;
+
+  var banner = document.getElementById("banner");
+  if (launched) {
+    banner.textContent = "Launched by the SCORM launcher. Buttons are active.";
+    banner.className = "banner ok";
+  } else {
+    banner.textContent = "Not launched from an LMS: open this page through the SCORM launcher. Buttons are disabled.";
+    banner.className = "banner warn";
+  }
+
+  var shown = [
+    ["Launched", launched ? "yes" : "no"],
+    ["In an iframe", inFrame ? "yes" : "no"],
+    ["lms_origin", lmsOrigin || "(missing)"],
+    ["learner_id", params.get("learner_id") || "(missing)"],
+    ["learner_name", params.get("learner_name") || "(missing)"],
+    ["Hashed IDs", params.get("are_identifiers_hashed") || "(missing)"]
+  ];
+  var launch = document.getElementById("launch");
+  shown.forEach(function (pair) {
+    var dt = document.createElement("dt");
+    dt.textContent = pair[0];
+    var dd = document.createElement("dd");
+    dd.textContent = pair[1];
+    launch.appendChild(dt);
+    launch.appendChild(dd);
+  });
+
+  var log = document.getElementById("log");
+  var sentCount = 0;
+
+  // Same message shape as SCOL-R's MessageEmitter: { function, arguments }, posted to the parent with the LMS origin as target.
+  function send(fn, args) {
+    var target = window.parent || window.opener;
+    target.postMessage({ "function": fn, "arguments": args }, lmsOrigin);
+    sentCount += 1;
+    var line = new Date().toLocaleTimeString() + "  " + fn + "(" + args.map(function (a) { return JSON.stringify(a); }).join(", ") + ")";
+    log.textContent = (sentCount === 1 ? "" : log.textContent + "\n") + line;
+    log.scrollTop = log.scrollHeight;
+  }
+
+  document.querySelectorAll("button[data-fn]").forEach(function (button) {
+    button.disabled = !launched;
+    button.addEventListener("click", function () {
+      var fn = button.getAttribute("data-fn");
+      var raw = button.getAttribute("data-arg");
+      var arg = fn === "setLessonStatus" ? raw : Number(raw);
+      send(fn, [arg]);
+    });
+  });
+
+  if (launched) {
+    send("setTitle", ["SCORM relay test page v" + PAGE_VERSION]);
+  }
+</script>
+</body>
+</html>
